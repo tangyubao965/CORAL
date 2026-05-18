@@ -25,7 +25,7 @@ CORAL introduces view-specific LoRA adapters and a gating network into the decod
 Please place the method figure under `figures/` and update the path below if needed.
 
 <p align="center">
-  <img src="figures/coral_overview.png" width="850">
+  <img src="figures/overview.png" width="850">
 </p>
 
 ## Key Findings
