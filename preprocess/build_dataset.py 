@@ -1,0 +1,45 @@
+
+import argparse
+from data.utils import *
+from data.build_docid_view import build_multiview_docids
+from data.build_docid_dict import build_docid_dict
+from data.build_prefix_tree import build_prefix_trie
+
+
+def main(args):
+    print("Loading corpus...")
+    corpus = load_jsonl(args.input_corpus)
+
+    print("Loading labeled queries...")
+    labeled_data = load_jsonl(args.labeled_queries)
+
+    # Generate multi-view docids (global, local, title)
+    print("Building multi-view docids...")
+    multiview_data = build_multiview_docids(
+        corpus, args.global_sent_limit, args.local_passage_sent, args.local_stride, args.docid_prefix
+    )
+
+    save_jsonl(multiview_data, args.output_multiview_file)
+
+    print("Building docid dictionary...")
+    docid_dict = build_docid_dict(multiview_data)
+    save_json(docid_dict, args.output_docid_dict)
+
+    print("Building prefix trie...")
+    build_prefix_trie(docid_dict, args.output_prefix_file)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_corpus", type=str, required=True)
+    parser.add_argument("--labeled_queries", type=str, required=True)
+    parser.add_argument("--global_sent_limit", type=int, default=128)
+    parser.add_argument("--local_passage_sent", type=int, default=4)
+    parser.add_argument("--local_stride", type=int, default=2)
+    parser.add_argument("--docid_prefix", type=str, default="d")
+    parser.add_argument("--output_multiview_file", type=str, required=True)
+    parser.add_argument("--output_docid_dict", type=str, required=True)
+    parser.add_argument("--output_prefix_file", type=str, required=True)
+    args = parser.parse_args()
+
+    main(args)

@@ -25,7 +25,7 @@ CORAL introduces view-specific LoRA adapters and a gating network into the decod
 Please place the method figure under `figures/` and update the path below if needed.
 
 <p align="center">
-  <img src="figures/overview.png" width="850">
+  <img src="figures/coral_overview.png" width="850">
 </p>
 
 ## Key Findings
@@ -69,12 +69,11 @@ Our experiments show that:
 │   ├── process_marco.py
 │   └── train_query_generation_model.py
 │
-└── Data/
-    ├── msmarco_data/
-    └── nq/
+└── data/
+    └── .gitkeep
 ```
 
-Note that the released `Data/` directory contains the processed or prepared files for MS MARCO and NQ only. BEIR datasets are not included in this repository and should be downloaded separately following the instructions below.
+The `data/` directory is intentionally left empty because the datasets are large. Please download the datasets manually or with the scripts below.
 
 ## Installation
 
@@ -86,25 +85,27 @@ conda activate coral
 pip install -r requirements.txt
 ```
 
-## Data Preparation
+Some dataset download examples below use additional packages:
 
-This repository supports MS MARCO, NQ 320K, and BEIR-style datasets.
-
-The current repository contains:
-
-```text
-Data/
-├── msmarco_data/
-└── nq/
+```bash
+pip install ir_datasets beir
 ```
 
-For MS MARCO and NQ, please place the files under the corresponding folders in `Data/`.
+## Data Preparation
 
-A typical input format is:
+This repository supports MS MARCO, NQ 320K, and BEIR-style datasets. Since the released `data/` folder is empty, please first download the required datasets and place them under `data/`.
+
+After downloading, the expected directory structure is:
 
 ```text
-Data/
+data/
 ├── msmarco_data/
+│   ├── collection.tsv
+│   ├── queries.train.tsv
+│   ├── queries.dev.tsv
+│   └── qrels.train.tsv
+│
+├── nq/
 │   ├── corpus.jsonl
 │   ├── queries.jsonl
 │   └── qrels/
@@ -112,32 +113,136 @@ Data/
 │       ├── dev.tsv
 │       └── test.tsv
 │
-└── nq/
-    ├── corpus.jsonl
-    ├── queries.jsonl
-    └── qrels/
-        ├── train.tsv
-        ├── dev.tsv
-        └── test.tsv
+└── beir/
+    └── dataset_name/
+        ├── corpus.jsonl
+        ├── queries.jsonl
+        └── qrels/
+            ├── train.tsv
+            ├── dev.tsv
+            └── test.tsv
 ```
 
-The expected input files are:
+The processed files used by CORAL are stored under `Data/processed/`.
 
-- `corpus.jsonl`: document id, title, and text.
-- `queries.jsonl`: query id and query text.
-- `qrels/*.tsv`: query-document relevance labels.
+## Downloading MS MARCO
 
-## Getting BEIR Datasets
+MS MARCO is not included in this repository. Please download the passage ranking files from the official MS MARCO dataset page.
 
-BEIR datasets are not included in the `Data/` folder. To run CORAL on BEIR, please download the desired BEIR dataset separately. The recommended way is to use the official BEIR package.
+Create the directory:
 
-First install BEIR if it is not already installed:
+```bash
+mkdir -p data/msmarco_data
+```
+
+A typical MS MARCO passage ranking setup requires:
+
+```text
+collection.tsv
+queries.train.tsv
+queries.dev.tsv
+qrels.train.tsv
+qrels.dev.tsv
+```
+
+You can download these files from the official MS MARCO ranking dataset page and place them under `Data/msmarco_data/`.
+
+If your downloaded files are compressed, unzip or untar them first. For example:
+
+```bash
+tar -xzf collection.tar.gz -C data/msmarco_data
+tar -xzf queries.tar.gz -C data/msmarco_data
+tar -xzf qrels.tar.gz -C data/msmarco_data
+```
+
+Then run the MS MARCO preprocessing script:
+
+```bash
+python preprocess/process_marco.py \
+  --input_dir data/msmarco_data \
+  --output_dir data/processed/msmarco320k
+```
+
+The preprocessing script converts raw MS MARCO files into the JSONL and qrels format used by CORAL.
+
+## Downloading NQ 320K
+
+The NQ 320K data used in retrieval experiments is derived from Natural Questions-style question-answering data. Because the raw data is large, it is not included in this repository.
+
+Please obtain Natural Questions from an official source and convert it into the following retrieval format:
+
+```text
+data/nq/
+├── corpus.jsonl
+├── queries.jsonl
+└── qrels/
+    ├── train.tsv
+    ├── dev.tsv
+    └── test.tsv
+```
+
+The required file formats are:
+
+`corpus.jsonl`
+
+```json
+{"doc_id": "doc1", "title": "Document title", "text": "Document content"}
+```
+
+`queries.jsonl`
+
+```json
+{"query_id": "q1", "query": "Question text"}
+```
+
+`qrels/*.tsv`
+
+```text
+query_id    doc_id    relevance
+q1          doc1      1
+```
+
+If you use `ir_datasets`, you can first cache the Natural Questions retrieval dataset locally:
+
+```python
+import ir_datasets
+
+dataset = ir_datasets.load("natural-questions")
+for query in dataset.queries_iter():
+    pass
+for doc in dataset.docs_iter():
+    pass
+for qrel in dataset.qrels_iter():
+    pass
+```
+
+Then convert the loaded queries, documents, and qrels into the `Data/nq/` format above.
+
+After preparing `data/nq/`, run:
+
+```bash
+python preprocess/build_dataset.py \
+  --input_dir data/nq \
+  --output_dir data/processed/nq
+```
+
+## Downloading BEIR
+
+BEIR datasets are not included in this repository. To run CORAL on BEIR, download the desired BEIR dataset separately. The recommended way is to use the official BEIR package.
+
+Create the directory:
+
+```bash
+mkdir -p data/beir
+```
+
+Install BEIR:
 
 ```bash
 pip install beir
 ```
 
-Then download a BEIR dataset, for example `nfcorpus`:
+Download a BEIR dataset, for example `nfcorpus`:
 
 ```python
 from beir import util
@@ -145,7 +250,7 @@ from beir import util
 dataset = "nfcorpus"
 url = f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset}.zip"
 
-out_dir = "Data/beir"
+out_dir = "data/beir"
 data_path = util.download_and_unzip(url, out_dir)
 
 print(data_path)
@@ -169,10 +274,10 @@ climate-fever
 scifact
 ```
 
-After downloading, the BEIR directory should look like:
+After downloading, the directory should look like:
 
 ```text
-Data/
+data/
 └── beir/
     └── nfcorpus/
         ├── corpus.jsonl
@@ -183,110 +288,100 @@ Data/
             └── test.tsv
 ```
 
-Some BEIR datasets may only provide a subset of these splits. For example, if only the test split is available, use `--splits test` when running the preprocessing script.
+Some BEIR datasets may only provide a subset of these splits. For example, if only the test split is available, use `--splits test`.
 
-## Preprocessing
-
-The preprocessing pipeline builds the corpus files, generates pseudo-queries, constructs multi-view docids, and builds the prefix trie for constrained decoding.
-
-### 1. Process MS MARCO
-
-```bash
-python preprocess/process_marco.py \
-  --input_dir Data/msmarco_data \
-  --output_dir Data/processed/msmarco320k
-```
-
-### 2. Process BEIR
-
-After downloading a BEIR dataset under `Data/beir/`, run:
+Run:
 
 ```bash
 python preprocess/preprocess_beir.py \
-  --beir_dir Data/beir/nfcorpus \
-  --output_dir Data/processed/beir/nfcorpus \
+  --beir_dir data/beir/nfcorpus \
+  --output_dir data/processed/beir/nfcorpus \
   --splits train,dev,test
 ```
 
-For BEIR datasets that only provide a test split, use:
+For a BEIR dataset with only a test split:
 
 ```bash
 python preprocess/preprocess_beir.py \
-  --beir_dir Data/beir/fiqa \
-  --output_dir Data/processed/beir/fiqa \
+  --beir_dir data/beir/fiqa \
+  --output_dir data/processed/beir/fiqa \
   --splits test
 ```
 
-### 3. Build query generation training data
+## Preprocessing Pipeline
+
+After obtaining a dataset and converting it into the expected format, run the CORAL preprocessing pipeline.
+
+### 1. Build query generation training data
 
 ```bash
 python preprocess/build_qg_training_data.py \
-  --dataset_dir Data/processed/msmarco320k \
-  --output_dir Data/qg_training/msmarco320k
+  --dataset_dir data/processed/msmarco320k \
+  --output_dir data/qg_training/msmarco320k
 ```
 
-### 4. Train the query generation model
+### 2. Train the query generation model
 
 ```bash
 python preprocess/train_query_generation_model.py \
-  --train_file Data/qg_training/msmarco320k/train.jsonl \
+  --train_file data/qg_training/msmarco320k/train.jsonl \
   --output_dir outputs/qg_model/msmarco320k
 ```
 
-### 5. Generate pseudo-queries
+### 3. Generate pseudo-queries
 
 ```bash
 python preprocess/generate_pseudo_queries.py \
   --model_dir outputs/qg_model/msmarco320k \
-  --corpus_file Data/processed/msmarco320k/corpus.jsonl \
-  --output_file Data/processed/msmarco320k/pseudo_queries.jsonl
+  --corpus_file data/processed/msmarco320k/corpus.jsonl \
+  --output_file data/processed/msmarco320k/pseudo_queries.jsonl
 ```
 
-### 6. Build global and local docid views
+### 4. Build global and local docid views
 
 ```bash
 python preprocess/passage_sampling_and_local_view.py \
-  --corpus_file Data/processed/msmarco320k/corpus.jsonl \
-  --output_file Data/processed/msmarco320k/local_views.jsonl
+  --corpus_file data/processed/msmarco320k/corpus.jsonl \
+  --output_file data/processed/msmarco320k/local_views.jsonl
 ```
 
 ```bash
 python preprocess/build_docid_view.py \
-  --corpus_file Data/processed/msmarco320k/corpus.jsonl \
-  --pseudo_query_file Data/processed/msmarco320k/pseudo_queries.jsonl \
-  --local_view_file Data/processed/msmarco320k/local_views.jsonl \
-  --output_dir Data/processed/msmarco320k/docids
+  --corpus_file data/processed/msmarco320k/corpus.jsonl \
+  --pseudo_query_file data/processed/msmarco320k/pseudo_queries.jsonl \
+  --local_view_file data/processed/msmarco320k/local_views.jsonl \
+  --output_dir data/processed/msmarco320k/docids
 ```
 
-### 7. Build document-docid pairs
+### 5. Build document-docid pairs
 
 ```bash
 python preprocess/build_doc_docid_pairs.py \
-  --docid_dir Data/processed/msmarco320k/docids \
-  --output_file Data/processed/msmarco320k/doc_docid_pairs.jsonl
+  --docid_dir data/processed/msmarco320k/docids \
+  --output_file data/processed/msmarco320k/doc_docid_pairs.jsonl
 ```
 
-### 8. Build labeled query-docid pairs
+### 6. Build labeled query-docid pairs
 
 ```bash
 python preprocess/build_labeled_query_docid_pairs.py \
-  --qrels_file Data/processed/msmarco320k/qrels/train.tsv \
-  --docid_dir Data/processed/msmarco320k/docids \
-  --output_file Data/processed/msmarco320k/train_pairs.jsonl
+  --qrels_file data/processed/msmarco320k/qrels/train.tsv \
+  --docid_dir data/processed/msmarco320k/docids \
+  --output_file data/processed/msmarco320k/train_pairs.jsonl
 ```
 
-### 9. Build docid dictionary and prefix trie
+### 7. Build docid dictionary and prefix trie
 
 ```bash
 python preprocess/build_docid_dict.py \
-  --docid_dir Data/processed/msmarco320k/docids \
-  --output_dir Data/processed/msmarco320k/index
+  --docid_dir data/processed/msmarco320k/docids \
+  --output_dir data/processed/msmarco320k/index
 ```
 
 ```bash
 python preprocess/build_prefix_trie.py \
-  --docid_file Data/processed/msmarco320k/index/valid_docids.txt \
-  --output_file Data/processed/msmarco320k/index/prefix_trie.pkl
+  --docid_file data/processed/msmarco320k/index/valid_docids.txt \
+  --output_file data/processed/msmarco320k/index/prefix_trie.pkl
 ```
 
 ## Training
@@ -296,8 +391,8 @@ Train CORAL with the processed query-docid pairs.
 ```bash
 python train.py \
   --config config.py \
-  --train_file Data/processed/msmarco320k/train_pairs.jsonl \
-  --docid_view_file Data/processed/msmarco320k/docids/docid_view_labels.json \
+  --train_file data/processed/msmarco320k/train_pairs.jsonl \
+  --docid_view_file data/processed/msmarco320k/docids/docid_view_labels.json \
   --output_dir outputs/checkpoints/coral_msmarco320k
 ```
 
@@ -318,9 +413,9 @@ During inference, CORAL uses trie-constrained beam search to ensure that generat
 ```bash
 python inference.py \
   --checkpoint_path outputs/checkpoints/coral_msmarco320k/best.pt \
-  --query_file Data/processed/msmarco320k/queries_test.jsonl \
-  --prefix_trie Data/processed/msmarco320k/index/prefix_trie.pkl \
-  --docid2doc Data/processed/msmarco320k/index/docid2doc.json \
+  --query_file data/processed/msmarco320k/queries_test.jsonl \
+  --prefix_trie data/processed/msmarco320k/index/prefix_trie.pkl \
+  --docid2doc data/processed/msmarco320k/index/docid2doc.json \
   --output_file outputs/predictions/coral_msmarco320k_test.json \
   --num_beams 100 \
   --top_k_docids 100 \
@@ -351,7 +446,7 @@ Example:
 
 ```bash
 python metrics.py \
-  --qrels Data/processed/msmarco320k/qrels/test.tsv \
+  --qrels data/processed/msmarco320k/qrels/test.tsv \
   --run outputs/predictions/coral_msmarco320k_test.json \
   --metrics MRR@3,Hits@1,Hits@10,Hits@100
 ```
@@ -360,7 +455,7 @@ For NQ 320K:
 
 ```bash
 python metrics.py \
-  --qrels Data/processed/nq/qrels/test.tsv \
+  --qrels data/processed/nq/qrels/test.tsv \
   --run outputs/predictions/coral_nq_test.json \
   --metrics MRR@1,Hits@1,Hits@10,MRR@20
 ```
@@ -409,18 +504,5 @@ The docid-to-document mapping is stored as:
 {
   "global docid text": "doc1",
   "local docid text": "doc1"
-}
-```
-
-## Citation
-
-If you find this repository useful, please cite our paper.
-
-```bibtex
-@inproceedings{coral2026,
-  title     = {CORAL: Corpus-Aligned Generative Retrieval with View-Aligned Modeling},
-  author    = {Anonymous Authors},
-  booktitle = {Proceedings of ...},
-  year      = {2026}
 }
 ```
